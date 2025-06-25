@@ -22,7 +22,7 @@ EXCEL_PATH = "output/store_checker_data.xlsx"
 # ✅ 드라이브 업로드 함수 추가
 def upload_to_drive(local_path, file_name):
     scope = ['https://www.googleapis.com/auth/drive']
-    credentials = ServiceAccountCredentials.from_json_keyfile_name('store-checker-drive-6df4537d2b55', scope)
+    credentials = ServiceAccountCredentials.from_json_keyfile_name('store-checker-drive-6df4537d2b55.json', scope)
     gauth = GoogleAuth()
     gauth.credentials = credentials
     drive = GoogleDrive(gauth)
