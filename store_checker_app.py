@@ -99,8 +99,15 @@ if st.button("제출하기"):
         insert_image(full_path, "B")
         insert_image(line1_path, "C")
         insert_image(line2_path, "D")
-
+        
         wb.save(EXCEL_PATH)
+
+        # ✅ 구글드라이브 업로드
+        try:
+            upload_to_drive(EXCEL_PATH, "store_checker_data.xlsx")
+            st.success("✅ 저장 및 드라이브 업로드 완료!")
+        except Exception as e:
+            st.error(f"⚠️ 드라이브 업로드 실패: {e}")
 
         # ✅ 구글드라이브 업로드
         try:
