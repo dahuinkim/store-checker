@@ -27,12 +27,12 @@ drive = GoogleDrive(drive_auth)
 gc = gspread.authorize(credentials)
 
 # 📄 구글 시트 ID
-SHEET_ID = "여기에_시트_ID_입력"
+SHEET_ID = "1ZpWTwJUjEWnMfQK7AICXANFV9BMSo_6JsZhVsatjVdM"
 SHEET_NAME = "시트1"
 worksheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
 # 📁 구글 드라이브 폴더 ID
-FOLDER_ID = "여기에_폴더_ID_입력"
+FOLDER_ID = "1rrrt-OmAYA08FMmyw7qO2HApOgyC24LY"
 
 st.title("📸 매장 진열 사진 등록 (Google 연동)")
 
