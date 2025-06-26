@@ -5,6 +5,7 @@ from openpyxl.drawing.image import Image as XLImage
 from PIL import Image
 import os
 from datetime import datetime
+import json
 
 # ⬇️ 구글 드라이브 업로드용 추가
 from pydrive.auth import GoogleAuth
@@ -19,22 +20,27 @@ if not os.path.exists("output"):
 
 EXCEL_PATH = "output/store_checker_data.xlsx"
 
-# ✅ 드라이브 업로드 함수 추가
+# ✅ 드라이브 업로드 함수
 def upload_to_drive(local_path, file_name):
     scope = ['https://www.googleapis.com/auth/drive']
-    credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
+    # 👇 시크릿에 저장된 gdrive_credentials 불러오기
+    json_key = json.loads(st.secrets["gdrive_credentials"])
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
+
     gauth = GoogleAuth()
     gauth.credentials = credentials
     drive = GoogleDrive(gauth)
 
-    folder_id = '1rrrt-OmAYA08FMmyw7qO2HApOgyC24LY'  # ← 꼭 바꿔주세요!
+    folder_id = '1rrrt-OmAYA08FMmyw7qO2HApOgyC24LY'  # ← 사용자에 따라 변경 필요
 
-    # 기존 동일 파일 삭제 후 새로 업로드
+    # 기존 동일 파일 삭제
     file_list = drive.ListFile({'q': f"title='{file_name}' and '{folder_id}' in parents and trashed=false"}).GetList()
     for f in file_list:
         f.Delete()
 
-    f = drive.CreateFile({'title': file_name, 'parents':[{'id': folder_id}]})
+    # 새로 업로드
+    f = drive.CreateFile({'title': file_name, 'parents': [{'id': folder_id}]})
     f.SetContentFile(local_path)
     f.Upload()
 
@@ -90,7 +96,6 @@ if st.button("제출하기"):
         ws.cell(row=row_num, column=7, value=brand)
         ws.cell(row=row_num, column=8, value=category)
 
-        # 사진 삽입 함수
         def insert_image(path, col_letter):
             img = XLImage(path)
             img.width, img.height = 150, 113
@@ -99,17 +104,9 @@ if st.button("제출하기"):
         insert_image(full_path, "B")
         insert_image(line1_path, "C")
         insert_image(line2_path, "D")
-        
+
         wb.save(EXCEL_PATH)
 
-        # ✅ 구글드라이브 업로드
-        try:
-            upload_to_drive(EXCEL_PATH, "store_checker_data.xlsx")
-            st.success("✅ 저장 및 드라이브 업로드 완료!")
-        except Exception as e:
-            st.error(f"⚠️ 드라이브 업로드 실패: {e}")
-
-        # ✅ 구글드라이브 업로드
         try:
             upload_to_drive(EXCEL_PATH, "store_checker_data.xlsx")
             st.success("✅ 저장 및 드라이브 업로드 완료!")
