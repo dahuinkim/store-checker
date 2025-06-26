@@ -114,4 +114,5 @@ if st.button("제출하기"):
             st.error(f"⚠️ 드라이브 업로드 실패: {e}")
     else:
         st.warning("⚠️ 모든 사진을 업로드해주세요.")
+st.write(st.secrets)
 
