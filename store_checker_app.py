@@ -65,6 +65,14 @@ line2 = st.text_input("2번 줄 제품명")
 brand = st.selectbox("브랜드 선택", brands)
 category = st.selectbox("카테고리 선택", categories)
 
+# 엑셀 파일 삭제용 버튼
+if st.button("💣 깨진 엑셀 파일 삭제하기"):
+    if os.path.exists(EXCEL_PATH):
+        os.remove(EXCEL_PATH)
+        st.success("✅ 깨진 엑셀 파일 삭제 완료")
+    else:
+        st.info("삭제할 엑셀 파일이 없어요.")
+
 # 저장 버튼
 if st.button("제출하기"):
     if full_photo and line1_photo and line2_photo:
