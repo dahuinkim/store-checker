@@ -1,40 +1,19 @@
 import streamlit as st
-import os
 from datetime import datetime
-from PIL import Image
-from io import BytesIO
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
 import tempfile
+from PIL import Image
 
-# ⬇️ 구글 인증 설정
-scope = [
-    'https://www.googleapis.com/auth/drive',
-    'https://www.googleapis.com/auth/spreadsheets'
-]
+# 📄 인증 (gspread + st.secrets)
+gc = gspread.service_account_from_dict(st.secrets["gdrive_credentials"])
 
-# 서비스 계정 시크릿 불러오기 (secrets.toml 에 저장한 값)
-credentials = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gdrive_credentials"], scope
-)
-
-drive_auth = GoogleAuth()
-drive_auth.credentials = credentials
-drive = GoogleDrive(drive_auth)
-
-gc = gspread.authorize(credentials)
-
-# 📄 구글 시트 ID
+# 📄 구글 시트 열기
 SHEET_ID = "1ZpWTwJUjEWnMfQK7AICXANFV9BMSo_6JsZhVsatjVdM"
 SHEET_NAME = "시트1"
 worksheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
-# 📁 구글 드라이브 폴더 ID
-FOLDER_ID = "1rrrt-OmAYA08FMmyw7qO2HApOgyC24LY"
-
-st.title("📸 매장 진열 사진 등록 (Google 연동)")
+# UI 구성
+st.title("📸 매장 진열 사진 등록")
 
 brands = ["테팔", "필립스", "락앤락", "도루코", "기타"]
 categories = ["주방", "생활용품", "가전", "세제", "기타"]
@@ -54,31 +33,16 @@ line2 = st.text_input("2번 줄 제품명")
 brand = st.selectbox("브랜드 선택", brands)
 category = st.selectbox("카테고리 선택", categories)
 
-# 업로드 함수
-def upload_photo(photo_file, filename):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        tmp.write(photo_file.getbuffer())
-        gfile = drive.CreateFile({'title': filename, 'parents': [{'id': FOLDER_ID}]})
-        gfile.SetContentFile(tmp.name)
-        gfile.Upload()
-        return gfile['alternateLink']
-
+# 제출
 if st.button("제출하기"):
     if full_photo and line1_photo and line2_photo:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 📤 사진 업로드
-        link_full = upload_photo(full_photo, f"full_{now}.jpg")
-        link_line1 = upload_photo(line1_photo, f"line1_{now}.jpg")
-        link_line2 = upload_photo(line2_photo, f"line2_{now}.jpg")
 
-        # 📊 구글 시트에 정보 입력
+        # 사진은 현재 구글 드라이브에 안 올림 (링크 필요 시 아래 참고)
         worksheet.append_row([
-            now, link_full, link_line1, link_line2,
+            now, "사진 링크 없음", "사진 링크 없음", "사진 링크 없음",
             line1, line2, brand, category
         ])
-
-        st.success("✅ 제출 완료! 구글 드라이브와 시트에 업로드되었습니다.")
+        st.success("✅ 제출 완료! 구글 시트에 저장되었습니다.")
     else:
         st.warning("⚠️ 모든 사진을 업로드해주세요.")
-
