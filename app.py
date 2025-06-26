@@ -31,9 +31,10 @@ if st.button("저장"):
                 photo_urls[label] = public_url
 
         # ✅ 테이블에 저장
-        supabase.table("product_photos").insert({
+        supabase.table("my_product_photos").insert({
             "full_photo": photo_urls.get("full", ""),
             "line1_text": photo_urls.get("line1", ""),
+            "line2_text": photo_urls.get("line2", ""),
             "brand": brand,
             "category": category,
         }).execute()
