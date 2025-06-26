@@ -1,63 +1,52 @@
 import streamlit as st
-import pandas as pd
-from openpyxl import load_workbook, Workbook
-from openpyxl.drawing.image import Image as XLImage
-from PIL import Image
 import os
 from datetime import datetime
-import json
-
-# ⬇️ 구글 드라이브 업로드용 추가
+from PIL import Image
+from io import BytesIO
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
-from oauth2client.service_account import ServiceAccountCredentials
+import tempfile
 
-# 파일 저장 경로
-if not os.path.exists("photos"):
-    os.makedirs("photos")
-if not os.path.exists("output"):
-    os.makedirs("output")
+# ⬇️ 구글 인증 설정
+scope = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/spreadsheets'
+]
 
-EXCEL_PATH = "output/store_checker_data.xlsx"
+# 서비스 계정 시크릿 불러오기 (secrets.toml 에 저장한 값)
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gdrive_credentials"], scope
+)
 
-# ✅ 드라이브 업로드 함수
-def upload_to_drive(local_path, file_name):
-    scope = ['https://www.googleapis.com/auth/drive']
+drive_auth = GoogleAuth()
+drive_auth.credentials = credentials
+drive = GoogleDrive(drive_auth)
 
-    # 👇 시크릿에 저장된 gdrive_credentials 불러오기
-    json_key = json.loads(st.secrets["gdrive_credentials"])
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
+gc = gspread.authorize(credentials)
 
-    gauth = GoogleAuth()
-    gauth.credentials = credentials
-    drive = GoogleDrive(gauth)
+# 📄 구글 시트 ID
+SHEET_ID = "여기에_시트_ID_입력"
+SHEET_NAME = "시트1"
+worksheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
-    folder_id = '1rrrt-OmAYA08FMmyw7qO2HApOgyC24LY'  # ← 사용자에 따라 변경 필요
+# 📁 구글 드라이브 폴더 ID
+FOLDER_ID = "여기에_폴더_ID_입력"
 
-    # 기존 동일 파일 삭제
-    file_list = drive.ListFile({'q': f"title='{file_name}' and '{folder_id}' in parents and trashed=false"}).GetList()
-    for f in file_list:
-        f.Delete()
+st.title("📸 매장 진열 사진 등록 (Google 연동)")
 
-    # 새로 업로드
-    f = drive.CreateFile({'title': file_name, 'parents': [{'id': folder_id}]})
-    f.SetContentFile(local_path)
-    f.Upload()
-
-# 브랜드/카테고리 선택
 brands = ["테팔", "필립스", "락앤락", "도루코", "기타"]
 categories = ["주방", "생활용품", "가전", "세제", "기타"]
 
-st.title("매장 진열 사진 입력 앱")
-
-# 사진 입력
+# 사진 업로드
 col1, col2, col3 = st.columns(3)
 with col1:
     full_photo = st.file_uploader("전체 진열사진", type=["jpg", "jpeg", "png"], key="full")
 with col2:
-    line1_photo = st.file_uploader("1번줄 사진", type=["jpg", "jpeg", "png"], key="line1")
+    line1_photo = st.file_uploader("1번 줄 사진", type=["jpg", "jpeg", "png"], key="line1")
 with col3:
-    line2_photo = st.file_uploader("2번줄 사진", type=["jpg", "jpeg", "png"], key="line2")
+    line2_photo = st.file_uploader("2번 줄 사진", type=["jpg", "jpeg", "png"], key="line2")
 
 # 정보 입력
 line1 = st.text_input("1번 줄 제품명")
@@ -65,62 +54,31 @@ line2 = st.text_input("2번 줄 제품명")
 brand = st.selectbox("브랜드 선택", brands)
 category = st.selectbox("카테고리 선택", categories)
 
-# 엑셀 파일 삭제용 버튼
-if st.button("💣 깨진 엑셀 파일 삭제하기"):
-    if os.path.exists(EXCEL_PATH):
-        os.remove(EXCEL_PATH)
-        st.success("✅ 깨진 엑셀 파일 삭제 완료")
-    else:
-        st.info("삭제할 엑셀 파일이 없어요.")
+# 업로드 함수
+def upload_photo(photo_file, filename):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        tmp.write(photo_file.getbuffer())
+        gfile = drive.CreateFile({'title': filename, 'parents': [{'id': FOLDER_ID}]})
+        gfile.SetContentFile(tmp.name)
+        gfile.Upload()
+        return gfile['alternateLink']
 
-# 저장 버튼
 if st.button("제출하기"):
     if full_photo and line1_photo and line2_photo:
-        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 📤 사진 업로드
+        link_full = upload_photo(full_photo, f"full_{now}.jpg")
+        link_line1 = upload_photo(line1_photo, f"line1_{now}.jpg")
+        link_line2 = upload_photo(line2_photo, f"line2_{now}.jpg")
 
-        full_path = f"photos/full_{now}.jpg"
-        line1_path = f"photos/line1_{now}.jpg"
-        line2_path = f"photos/line2_{now}.jpg"
-        with open(full_path, "wb") as f:
-            f.write(full_photo.getbuffer())
-        with open(line1_path, "wb") as f:
-            f.write(line1_photo.getbuffer())
-        with open(line2_path, "wb") as f:
-            f.write(line2_photo.getbuffer())
+        # 📊 구글 시트에 정보 입력
+        worksheet.append_row([
+            now, link_full, link_line1, link_line2,
+            line1, line2, brand, category
+        ])
 
-        # 엑셀 열기/만들기
-        if os.path.exists(EXCEL_PATH):
-            wb = load_workbook(EXCEL_PATH)
-            ws = wb.active
-        else:
-            wb = Workbook()
-            ws = wb.active
-            ws.append(["입력시간", "전체사진", "줄1사진", "줄2사진", "줄1 제품", "줄2 제품", "브랜드", "카테고리"])
-
-        row_num = ws.max_row + 1
-        ws.cell(row=row_num, column=1, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        ws.cell(row=row_num, column=5, value=line1)
-        ws.cell(row=row_num, column=6, value=line2)
-        ws.cell(row=row_num, column=7, value=brand)
-        ws.cell(row=row_num, column=8, value=category)
-
-        def insert_image(path, col_letter):
-            img = XLImage(path)
-            img.width, img.height = 150, 113
-            ws.add_image(img, f"{col_letter}{row_num}")
-
-        insert_image(full_path, "B")
-        insert_image(line1_path, "C")
-        insert_image(line2_path, "D")
-
-        wb.save(EXCEL_PATH)
-
-        try:
-            upload_to_drive(EXCEL_PATH, "store_checker_data.xlsx")
-            st.success("✅ 저장 및 드라이브 업로드 완료!")
-        except Exception as e:
-            st.error(f"⚠️ 드라이브 업로드 실패: {e}")
+        st.success("✅ 제출 완료! 구글 드라이브와 시트에 업로드되었습니다.")
     else:
         st.warning("⚠️ 모든 사진을 업로드해주세요.")
-st.write(st.secrets)
 
